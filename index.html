@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dino</title>
+  <style>
+    body {
+        margin: 0;
+        background-color:#001113;
+        background-image: url("images/rawr.png");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-family: 'Segoe UI', Tahoma, Verdana, sans-serif;
+        user-select: none;
+        min-height: 100vh;
+    }
+    h1 {
+      font-size: 80px;
+      margin: 20px 0 0;
+      color: #00af35;
+      text-shadow: 2px 2px 4px #000;
+    }
+    #game-container {
+      position: relative;
+      background: #4ec0ca;
+      width: 700px;
+      height: 400px;
+      overflow: hidden;
+      border: 4px solid #cfffa8;
+      border-radius: 10px;
+      box-shadow: 0 0 30px rgba(66, 255, 28, 0.884);
+    }
+    #bird {
+      position: absolute;
+      width: 50px;
+      height: 40px;
+      left: 120px;
+      top: 185px;
+      transition: transform 0.1s linear;
+    }
+    #bird svg {
+      width: 100%;
+      height: 100%;
+    }
+    .pipe {
+      position: absolute;
+      width: 80px;
+      background: #0c0;
+      border: 3px solid #060;
+      border-radius: 8px;
+      box-shadow: inset 2px 2px 8px #090;
+    }
+    #scoreboard {
+      margin: 10px;
+      color: #fff;
+      font-size: 24px;
+      text-shadow: 1px 1px 2px #000;
+    }
+    #high-score {
+      font-size: 30px;
+      margin-bottom: 38px;
+      margin-top: 38px;
+      color: #fff496;
+    }
+    #message {
+      color: #fffa;
+      font-weight: bold;
+      font-size: 20px;
+      margin-top: 10px;
+      height: 24px;
+      text-align: center;
+      text-shadow: 1px 1px 2px #000;
+      width: 700px;
+    }
+    #start-btn, #pause-btn {
+      margin: 10px 5px 20px;
+      padding: 10px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #0a0;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #070;
+    }
+    #pause-btn {
+      background: #d80;
+      box-shadow: 0 3px 0 #a60;
+    }
+    #start-btn:active, #pause-btn:active {
+      box-shadow: none;
+      transform: translateY(3px);
+    }
+  </style>
+</head>
+<body>
+
+<h1>Hopping Dino</h1>
+<div id="high-score">Highest Score: 0</div>
+<div id="scoreboard">Score: 0</div>
+<div id="game-container" tabindex="0" aria-label="Game area">
+  <div id="bird" aria-label="Dinosaur" role="img">
+
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="32" cy="40" rx="22" ry="16" fill="#6AA84F" />
+      <polygon points="10,40 0,30 8,42" fill="#528D4D" />
+      <rect x="40" y="15" width="10" height="22" rx="5" ry="5" fill="#6AA84F" />
+      <circle cx="48" cy="12" r="10" fill="#6AA84F" />
+      <circle cx="52" cy="10" r="3" fill="#fff" />
+      <circle cx="52" cy="10" r="1.5" fill="#000" />
+      <rect x="18" y="52" width="8" height="12" rx="3" ry="3" fill="#528D4D" />
+      <rect x="36" y="52" width="8" height="12" rx="3" ry="3" fill="#528D4D" />
+    </svg>
+  </div>
+</div>
+<div>
+  <button id="start-btn">Start Game</button>
+  <button id="pause-btn">Pause</button>
+</div>
+<div id="message"></div>
+
+<script>
+(() => {
+  const gameContainer = document.getElementById('game-container');
+  const bird = document.getElementById('bird');
+  const scoreboard = document.getElementById('scoreboard');
+  const highScoreEl = document.getElementById('high-score');
+  const startBtn = document.getElementById('start-btn');
+  const pauseBtn = document.getElementById('pause-btn');
+  const message = document.getElementById('message');
+
+  const gameWidth = gameContainer.clientWidth;
+  const gameHeight = gameContainer.clientHeight;
+  const birdWidth = bird.offsetWidth;
+  const birdHeight = bird.offsetHeight;
+
+  let birdY = 185;
+  let birdVelocity = 0;
+  const gravity = 0.5; // smoother gravity
+  const jumpStrength = -8;
+  let pipes = [];
+  const pipeWidth = 80;
+  const pipeGap = 180;
+  const pipeSpeed = 3;
+  let frameId;
+  let gameRunning = false;
+  let paused = false;
+  let score = 0;
+  let highestScore = localStorage.getItem('flappyHighScore') || 0;
+
+  highScoreEl.textContent = `Highest Score: ${highestScore}`;
+  scoreboard.textContent = `Score: 0`;
+
+  function createPipePair(xPos) {
+    const pipeTop = document.createElement('div');
+    const pipeBottom = document.createElement('div');
+
+    pipeTop.classList.add('pipe');
+    pipeBottom.classList.add('pipe');
+
+    const gapStart = Math.floor(Math.random() * (gameHeight - pipeGap - 60)) + 30;
+
+    pipeTop.style.height = gapStart + 'px';
+    pipeTop.style.top = '0px';
+    pipeTop.style.left = xPos + 'px';
+
+    pipeBottom.style.height = (gameHeight - gapStart - pipeGap) + 'px';
+    pipeBottom.style.top = (gapStart + pipeGap) + 'px';
+    pipeBottom.style.left = xPos + 'px';
+
+    gameContainer.appendChild(pipeTop);
+    gameContainer.appendChild(pipeBottom);
+
+    return { top: pipeTop, bottom: pipeBottom, passed: false };
+  }
+
+  function resetGame() {
+    birdY = 185;
+    birdVelocity = 0;
+    score = 0;
+    scoreboard.textContent = `Score: ${score}`;
+    message.textContent = '';
+    pipes.forEach(p => {
+      gameContainer.removeChild(p.top);
+      gameContainer.removeChild(p.bottom);
+    });
+    pipes = [];
+    for (let i = 0; i < 4; i++) {
+      pipes.push(createPipePair(gameWidth + i * 280));
+    }
+  }
+
+  function gameOver(text) {
+    gameRunning = false;
+    cancelAnimationFrame(frameId);
+    startBtn.disabled = false;
+    startBtn.textContent = "Restart Game";
+    pauseBtn.disabled = true;
+
+    if (score > highestScore) {
+      highestScore = score;
+      localStorage.setItem('flappyHighScore', highestScore);
+      highScoreEl.textContent = `Highest Score: ${highestScore}`;
+      text += " 🎉 New High Score!";
+    }
+    message.textContent = text + " Press Restart to play again.";
+  }
+
+  function rectsOverlap(r1, r2) {
+    return !(r2.left > r1.right ||
+             r2.right < r1.left ||
+             r2.top > r1.bottom ||
+             r2.bottom < r1.top);
+  }
+
+  function update() {
+    if (!gameRunning || paused) return;
+
+    birdVelocity += gravity;
+    birdY += birdVelocity;
+
+    if (birdY < 0) {
+      birdY = 0;
+      birdVelocity = 0;
+    }
+    if (birdY + birdHeight > gameHeight) {
+      birdY = gameHeight - birdHeight;
+      gameOver("💥 You hit the ground!");
+      return;
+    }
+
+    bird.style.top = birdY + 'px';
+
+    pipes.forEach(pipe => {
+      const left = parseFloat(pipe.top.style.left);
+      const newLeft = left - pipeSpeed;
+      pipe.top.style.left = newLeft + 'px';
+      pipe.bottom.style.left = newLeft + 'px';
+
+      if (!pipe.passed && newLeft + pipeWidth < 120) {
+        score++;
+        scoreboard.textContent = `Score: ${score}`;
+        pipe.passed = true;
+      }
+
+      if (newLeft + pipeWidth < 0) {
+        gameContainer.removeChild(pipe.top);
+        gameContainer.removeChild(pipe.bottom);
+        pipes.shift();
+        const lastPipeX = pipes.length > 0 ? parseFloat(pipes[pipes.length - 1].top.style.left) : gameWidth;
+        pipes.push(createPipePair(lastPipeX + 280));
+      }
+    });
+
+    const birdRect = bird.getBoundingClientRect();
+    for (const pipe of pipes) {
+      const topRect = pipe.top.getBoundingClientRect();
+      const bottomRect = pipe.bottom.getBoundingClientRect();
+      if (rectsOverlap(birdRect, topRect) || rectsOverlap(birdRect, bottomRect)) {
+        gameOver("💥 You hit a pipe!");
+        return;
+      }
+    }
+
+    frameId = requestAnimationFrame(update);
+  }
+
+  function jump() {
+    if (!gameRunning || paused) return;
+    birdVelocity = jumpStrength;
+    bird.style.transform = "rotate(-25deg)";
+    setTimeout(() => {
+      bird.style.transform = "rotate(0deg)";
+    }, 150);
+  }
+
+  startBtn.addEventListener('click', () => {
+    if (gameRunning) return;
+    resetGame();
+    gameRunning = true;
+    paused = false;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = "Pause";
+    message.textContent = '';
+    update();
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    if (!gameRunning) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    if (!paused) update();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      jump();
+    } else if (e.code === 'KeyP') {
+      pauseBtn.click();
+    }
+  });
+
+  gameContainer.addEventListener('mousedown', jump);
+  gameContainer.addEventListener('touchstart', e => {
+    e.preventDefault();
+    jump();
+  }, { passive: false });
+
+})();
+</script>
+
+</body>
+</html>
